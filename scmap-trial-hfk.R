@@ -131,18 +131,39 @@ rep.sce <- indexCluster.SingleCellExperiment(rep.sce, cluster_col = "res.1.6")
 heatmap(as.matrix(metadata(rep.sce)$scmap_cluster_index))
 
 scmapCluster_results_rep <- scmapCluster.SingleCellExperiment(
-  projection = hfk.sce, 
+  projection = rep.sce, 
   index_list = list(
-    reporters = metadata(rep.sce)$scmap_cluster_index
-  ), threshold = 0.3
+    reporters = metadata(hfk.sce)$scmap_cluster_index
+  ), threshold = 0.7
 )
 
 head(scmapCluster_results_rep$scmap_cluster_labs)
+head(scmapCluster_results_rep$scmap_cluster_siml)
+
 
 plot(
   getSankey(
     colData(rep.sce)$"res.1.6", 
     scmapCluster_results_rep$scmap_cluster_labs[,'reporters'],
-    plot_height = 400
+    plot_height = 800,
+    plot_width = 800
   )
 )
+
+qplot(x = scmapCluster_results_rep$scmap_cluster_siml[,'reporters'])
+reporters@meta.data$scmap <- scmapCluster_results_rep$scmap_cluster_labs[,'reporters']
+# Plot scmap assigned cluster identity to tsne plot of data
+plot1 <- TSNEPlot(reporters, do.return=T, no.legend = F, do.label = T)
+plot2 <- TSNEPlot(reporters, do.label =T, group.by = "scmap")
+plot_grid(plot1, plot2)
+
+reporters <- SetIdent(reporters, ident.use = reporters@meta.data$scmap)
+neph.prog <- SubsetData(reporters, ident.use = "Neph Progenitors")
+tubules <- SubsetData(reporters, ident.use = c("Prox Tubule/Gloms", "Coll Duct/Dist Tubule"))
+unassigned <- SubsetData(reporters, ident.use = c("unassigned"))
+plot1 <- TSNEPlot(neph.prog, do.return=T, no.legend = T, do.label = T)
+plot2 <- TSNEPlot(tubules, do.return = T, no.legend=T, do.label = T)
+TSNEPlot(unassigned, do.return = T, no.legend = F)
+plot_grid(plot1, plot2)
+
+
