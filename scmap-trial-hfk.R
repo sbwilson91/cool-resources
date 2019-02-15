@@ -96,5 +96,53 @@ heatmap(as.matrix(metadata(hfk.sce)$scmap_cluster_index))
 
 # Projection of dataset back onto itself
 
-scmapCluster_results <- scmapCluster(projection = hfk.sce,
-                                     index_list = list(hfk = metadata(hfk.sce)$scmap_cluster_index))
+scmapCluster_results <- scmapCluster.SingleCellExperiment(projection = hfk.sce,
+                                     index_list = list(hfk = metadata(hfk.sce)$scmap_cluster_index),
+                                     threshold = 0.2)
+head(scmapCluster_results$scmap_cluster_labs)
+
+plot(
+  getSankey(
+    colData(hfk.sce)$ident, 
+    scmapCluster_results$scmap_cluster_labs[,'hfk'],
+    plot_height = 800,
+    plot_width = 1200
+  )
+)
+head(scmapCluster_results$scmap_cluster_labs)
+hfk@meta.data$scmap <- scmapCluster_results$scmap_cluster_labs[,'hfk']
+# Plot scmap assigned cluster identity to tsne plot of data
+plot1 <- TSNEPlot(hfk, do.return=T, no.legend = T, do.label = T)
+plot2 <- TSNEPlot(hfk, do.label =F, group.by = "scmap")
+plot_grid(plot1, plot2)
+
+
+# Compare our organoid datasets to the hfk dataset
+
+reporters <- readRDS("../../../../../GROUPS/Stem cells and Regeneration/Single Cell/Reporters_18vs25Days/output/seurat/D18vsD25_combined_20clusters_seurat.rds")
+TSNEPlot(reporters, do.label = T, group.by = "res.1.6")
+reporters <- SetIdent(reporters, ident.use = reporters@meta.data$res.1.6)
+TSNEPlot(reporters)
+
+rep.sce <- Convert(from = reporters, to = "sce")
+rowData(rep.sce)$feature_symbol <- rownames(rep.sce)
+rep.sce <- selectFeatures.SingleCellExperiment(rep.sce, n_features = 500, suppress_plot = F)
+rep.sce <- indexCluster.SingleCellExperiment(rep.sce, cluster_col = "res.1.6")
+heatmap(as.matrix(metadata(rep.sce)$scmap_cluster_index))
+
+scmapCluster_results_rep <- scmapCluster.SingleCellExperiment(
+  projection = hfk.sce, 
+  index_list = list(
+    reporters = metadata(rep.sce)$scmap_cluster_index
+  ), threshold = 0.3
+)
+
+head(scmapCluster_results_rep$scmap_cluster_labs)
+
+plot(
+  getSankey(
+    colData(rep.sce)$"res.1.6", 
+    scmapCluster_results_rep$scmap_cluster_labs[,'reporters'],
+    plot_height = 400
+  )
+)
