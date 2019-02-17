@@ -24,13 +24,14 @@ Template for using scmap to assign cell types to single cell RNAseq transcriptio
 
 First we need to load libraries required for the analysis. 
 
-```{r libraries, include=T}
+```{r libraries, include=TRUE}
 library(scmap) # the scmap package
 library(SingleCellExperiment) # single cell experiment is the file type scmap uses for transcriptional data
 library(GEOquery) # package to download GEO accesion data
 library(Seurat) # package that allows for the analysis of single cell data, use to do QC and clustering and convert to sce post analysis
 library(clustree) # clustering visualisation 
 library(tidyverse) # essential data management package
+source("scmap-functions.R") # some minor edits to functions
 ```
 
 There are two files we need to initially load into our run: the annotated dataset and test dataset. For this run, the annotated dataset is the single cell RNAseq Human Fetal Kidney dataset from Lindstrom (citation) located at GSE102596. The second is a combined dataset of two organoids generated from the same line, different batches and different ages, previously compared in our lineage tracing paper (citation).
@@ -80,13 +81,79 @@ markers.list <- lapply(0:(length(unique(hfk@ident))-1), function(x) {
 
 Once this is completed, and you are happy with the clustering and annotation of these clusters, the following chunk will rename each cluster and apply that identifier to each cell.
 
-```{r hfg-annotation}
+```{r hfk-annotation}
 
 current.cluster.ids <- c(0,1,2,3,4,5,6,7,8,9,10)
 new.cluster.ids <- c("Stroma 1", "Stroma 2", "Neph Progenitors", "Stroma DCN", "Endothelium", "Stroma 3", 
                      "Macrophage", "Coll Duct/Dist Tubule", "Prox Tubule/Gloms", "Cell Cycle", "Blood")
 hfk@ident <- plyr::mapvalues(hfk@ident,from = current.cluster.ids, to=new.cluster.ids)
+
+TSNEPlot(hfk, group.by = "ident")
 ```
+
+The scmap package requires the data to be in sce format. This is easy to do with the Convert() function
+
+```{r sce-convert}
+hfk.sce <- Convert(from = hfk, to = "sce")
+```
+
+## Feature selection
+
+Select the most informative genes from the input dataset (highlighted in red on the graph). Default is to set 500 features, can increase or decrease this as required.
+
+```{r features}
+rowData(hfk.sce)$feature_symbol <- rownames(hfk.sce)
+hfk.sce <- hfk.sce[!duplicated(rownames(hfk.sce)),]
+hfk.sce <- selectFeatures.SingleCellExperiment(hfk.sce, suppress_plot = F, n_features = 500)
+```
+
+## scmap-cluster
+
+The scmap-cluster index of a reference dataset is created by finding the median gene expression for each cluster.
+
+```{r scmap-cluster}
+hfk.sce <- indexCluster.SingleCellExperiment(hfk.sce, cluster_col = "ident")
+head(metadata(hfk.sce)$scmap_cluster_index)
+heatmap(as.matrix(metadata(hfk.sce)$scmap_cluster_index))
+```
+
+## Projection analysis
+
+We now have an index of median gene expression relating to each of the clusters from the input data. Now we can use this index to assign identity to an input dataset. To test this, we can project the index dataset back onto itself, then we can use a different dataset and see where those cells are assigned. The threshold of simmilarity required to assign a cell to a cluster can be adjusted.
+
+```{r projection-test}
+scmapCluster_results <- scmapCluster.SingleCellExperiment(projection = hfk.sce,
+                                     index_list = list(hfk = metadata(hfk.sce)$scmap_cluster_index),
+                                     threshold = 0.7)
+
+# visualise by sankey graphing method
+plot(
+  getSankey(
+    colData(hfk.sce)$ident, 
+    scmapCluster_results$scmap_cluster_labs[,'hfk'],
+    plot_height = 800,
+    plot_width = 1200
+  )
+)
+# TSNE plot of reassigned cells by cluster
+hfk@meta.data$scmap <- scmapCluster_results$scmap_cluster_labs[,'hfk']
+plot1 <- TSNEPlot(hfk, do.return=T, no.legend = F, do.label = T)
+plot2 <- TSNEPlot(hfk, do.label =F, group.by = "scmap")
+plot_grid(plot1, plot2)
+plot1
+plot2
+
+# This gets a bit messy with the unassigned values. lets look only at assigned
+
+assigned <- SubsetData(SetIdent(hfk, ident.use = hfk@meta.data$scmap), ident.use = "unassigned")
+TSNEPlot(assigned)
+```
+
+
+
+
+
+
 
 
 
