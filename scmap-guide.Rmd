@@ -99,12 +99,12 @@ hfk.sce <- Convert(from = hfk, to = "sce")
 
 ## Feature selection
 
-Select the most informative genes from the input dataset (highlighted in red on the graph). Default is to set 500 features, can increase or decrease this as required.
+Select the most informative genes from the input dataset (highlighted in red on the graph). I found that 50-100 features gives a "good" result, i.e. the majority of cells are assigned to their original clusters, there aren't many unassigned. Can increase or decrease this as required.
 
 ```{r features}
 rowData(hfk.sce)$feature_symbol <- rownames(hfk.sce)
 hfk.sce <- hfk.sce[!duplicated(rownames(hfk.sce)),]
-hfk.sce <- selectFeatures.SingleCellExperiment(hfk.sce, suppress_plot = F, n_features = 500)
+hfk.sce <- selectFeatures.SingleCellExperiment(hfk.sce, suppress_plot = F, n_features = 100)
 ```
 
 ## scmap-cluster
@@ -124,7 +124,7 @@ We now have an index of median gene expression relating to each of the clusters 
 ```{r projection-test}
 scmapCluster_results <- scmapCluster.SingleCellExperiment(projection = hfk.sce,
                                      index_list = list(hfk = metadata(hfk.sce)$scmap_cluster_index),
-                                     threshold = 0.7)
+                                     threshold = 0.5)
 
 # visualise by sankey graphing method
 plot(
@@ -135,20 +135,61 @@ plot(
     plot_width = 1200
   )
 )
+
+# Plot the similarity value for each cell
+
+qplot(x = scmapCluster_results$scmap_cluster_siml[,'hfk'],
+      binwidth = 0.01)
+
+
 # TSNE plot of reassigned cells by cluster
 hfk@meta.data$scmap <- scmapCluster_results$scmap_cluster_labs[,'hfk']
 plot1 <- TSNEPlot(hfk, do.return=T, no.legend = F, do.label = T)
 plot2 <- TSNEPlot(hfk, do.label =F, group.by = "scmap")
 plot_grid(plot1, plot2)
-plot1
-plot2
 
-# This gets a bit messy with the unassigned values. lets look only at assigned
-
-assigned <- SubsetData(SetIdent(hfk, ident.use = hfk@meta.data$scmap), ident.use = "unassigned")
-TSNEPlot(assigned)
 ```
 
+There is a small amount of shuffling of identities doing this analysis, the cluster most affected looks to be the nephron progenitors. This could be because there is a stronger score with a reduced number of features in cells closer to a committed phate instead of their progenitor state. For now, let's say that there is an acceptable assignment of cell types using our feature based index. Now, we can compare and assign a seperate dataset.
+
+```{r projection-organoids}
+reporters <- SetIdent(reporters, ident.use = reporters@meta.data$res.1.6)
+TSNEPlot(reporters, do.label = T)
+
+rep.sce <- Convert(from = reporters, to = "sce")
+rowData(rep.sce)$feature_symbol <- rownames(rep.sce)
+#rep.sce <- selectFeatures.SingleCellExperiment(rep.sce, n_features = 500, suppress_plot = F)
+#rep.sce <- indexCluster.SingleCellExperiment(rep.sce, cluster_col = "res.1.6")
+#heatmap(as.matrix(metadata(rep.sce)$scmap_cluster_index))
+
+scmapCluster_results_rep <- scmapCluster.SingleCellExperiment(
+  projection = rep.sce, 
+  index_list = list(
+    reporters = metadata(hfk.sce)$scmap_cluster_index
+  ), threshold = 0.2
+)
+
+head(scmapCluster_results_rep$scmap_cluster_labs)
+head(scmapCluster_results_rep$scmap_cluster_siml)
+
+plot(
+  getSankey(
+    colData(rep.sce)$"res.1.6", 
+    scmapCluster_results_rep$scmap_cluster_labs[,'reporters'],
+    plot_height = 800,
+    plot_width = 1200
+  )
+)
+
+qplot(x = scmapCluster_results_rep$scmap_cluster_siml[,'reporters'], binwidth = 0.01)
+reporters@meta.data$scmap <- scmapCluster_results_rep$scmap_cluster_labs[,'reporters']
+
+# Plot scmap assigned cluster identity to tsne plot of data
+
+plot1 <- TSNEPlot(reporters, do.return=T, no.legend = F, do.label = T)
+plot2 <- TSNEPlot(reporters, do.label =T, group.by = "scmap")
+plot_grid(plot1, plot2)
+```
 
 
 
