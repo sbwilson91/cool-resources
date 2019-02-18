@@ -13,18 +13,18 @@ params:
 Today's date is `r params$d`
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Introduction
 
-Template for using scmap to assign cell types to single cell RNAseq transcriptional data. The goal of this document is to provide an editable template showing a workflow to download datasets from GEO and use these to compare to a personally generated dataset. The package scmap (citation) can compare your single cell transcriptomes to previously annotated datsets and assign cell type and cluster information based on this.
+Template for using scmap to assign cell types to single cell RNAseq transcriptional data. The goal of this document is to provide an editable template showing a workflow to download datasets from GEO and use these to compare to a personally generated dataset. The package scmap <https://doi.org/10.1038/nmeth.4644> or github <https://github.com/hemberg-lab/scmap> can compare your single cell transcriptomes to previously annotated datsets and assign cell type and cluster information based on this.
 
 # Preparation
 
 First we need to load libraries required for the analysis. 
 
-```{r libraries, include=TRUE}
+```{r libraries, echo=FALSE}
 library(scmap) # the scmap package
 library(SingleCellExperiment) # single cell experiment is the file type scmap uses for transcriptional data
 library(GEOquery) # package to download GEO accesion data
@@ -67,7 +67,7 @@ clustree(hfk)
 TSNEPlot(object = hfk, group.by = "res.0.6")
 hfk <- SetIdent(hfk, ident.use = hfk@meta.data$res.0.6)
 
-FeaturePlot(hfk, features.plot = c("TMEM213", "GATA3", "CD14", "TCF21"), cols.use = c("grey", "red"))
+FeaturePlot(hfk, features.plot = c("GATA3", "COL3A1", "NPHS1", "EPCAM", "SIX1", "PAX2"), cols.use = c("grey", "red"), nCol = 3)
 
 markers <- FindAllMarkers(hfk, min.pct = 0.1, logfc.threshold = 0.5)
 
@@ -144,9 +144,9 @@ qplot(x = scmapCluster_results$scmap_cluster_siml[,'hfk'],
 
 # TSNE plot of reassigned cells by cluster
 hfk@meta.data$scmap <- scmapCluster_results$scmap_cluster_labs[,'hfk']
-plot1 <- TSNEPlot(hfk, do.return=T, no.legend = F, do.label = T)
-plot2 <- TSNEPlot(hfk, do.label =F, group.by = "scmap")
-plot_grid(plot1, plot2)
+TSNEPlot(hfk, do.return=T, no.legend = F, do.label = T)
+TSNEPlot(hfk, do.label =F, group.by = "scmap")
+
 
 ```
 
@@ -186,12 +186,26 @@ reporters@meta.data$scmap <- scmapCluster_results_rep$scmap_cluster_labs[,'repor
 
 # Plot scmap assigned cluster identity to tsne plot of data
 
-plot1 <- TSNEPlot(reporters, do.return=T, no.legend = F, do.label = T)
-plot2 <- TSNEPlot(reporters, do.label =T, group.by = "scmap")
-plot_grid(plot1, plot2)
+TSNEPlot(reporters, do.return=T, no.legend = F, do.label = T)
+TSNEPlot(reporters, do.label =T, group.by = "scmap")
+
 ```
 
+Interestingly, there are two peaks in the distribution of alignment scores, one around 0.5 and one around 0.8. What cell types contain the lower aligment scores compared to the higher ones? My guess is that the multiple "stromal" populations contain similar scores for their feature index, and will those cells will be less specific to any one cluster.
 
+```{r alignment-dist}
+reporters@meta.data$scores <- round(scmapCluster_results_rep$scmap_cluster_siml[, 'reporters'], digits = 1) # round so as to make graphing easier
+TSNEPlot(reporters, group.by = "scores")
+
+```
+
+The cell cycle cluster on the left and the stromal population left centre give very strong similarity to the corresponding index in the human fetal kidney data. The weakest regions of similarity are where the podocyte cells (top middle) and subset of a stromal cluster (lower middle right) are located. The HFK dataset doesn't have many podocytes, and there will be differences in stromal pops, so these don't seem out of place. there is a medium-high similarity in the majority of nephron lineages. I think this has done a decent enough job at assigning cell types based on a limited dataset index (the HFK), and the differences in experiments and cell lines (organoids generated from iPSCs vs real human fetal kidney samples).
+
+This template can serve as a launch point for any analysis using scmap. I'll continue with our other datasets, also try and use other available datasets as an index, as well as using annotated organoids against eachother. I can also try to "merge" the two datasets together prior using a cca/multicca, subset individual datasets and repeat the process. This might eliminate more batch variation and cause higher correlation scores.
+
+```{r session-info}
+sessionInfo()
+```
 
 
 
