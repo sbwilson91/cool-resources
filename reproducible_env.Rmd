@@ -1,0 +1,106 @@
+---
+title: "renv"
+author: "Sean Wilson"
+date: "4/23/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Reproducible Environments
+
+This rmd file is based off a post at <https://www.r-bloggers.com/reproducible-environments/>
+
+## Premise
+
+An environment consists of all the dependencies required to enable your code to
+run correctly. This includes R itself, R packages, and system dependencies. As
+with many programming languages, it can be challenging to manage reproducible R
+environments.
+
+A strategy for safely upgrading packages consists of three steps:
+
+Isolate a project
+Record the current dependencies
+Upgrade packages
+
+## using renv
+
+The first step in this strategy ensures one project’s packages and upgrades
+won’t interfere with any other projects. Isolating projects is accomplished by
+creating per-project libraries. A tool that makes this easy is the new <https://github.com/rstudio/renv> renv
+package. Inside of your R project, simply use:
+
+```{r}
+devtools::install_github("rstudio/renv")
+```
+
+
+```{r}
+# inside the project directory
+renv::init()
+```
+
+The second step is to record the current dependencies. This step is critical
+because it creates a safety net. If the package upgrade goes poorly, you’ll be
+able to revert the changes and return to the record of the working state. Again,
+the renv package makes this process easy.
+
+```{r}
+# record the current dependencies in a file called renv.lock
+renv::snapshot()
+
+# commit the lockfile alongside your code in version control
+# and use this function to view the history of your lockfile
+renv::history()
+
+# if an upgrade goes astray, revert the lockfile
+renv::revert(commit = "abc123")
+
+# and restore the previous environment
+renv::restore()
+```
+
+With an isolated project and a safety net in place, you can now proceed to
+upgrade or add new packages, while remaining certain the current functional
+environment is still reproducible. The pak <https://github.com/r-lib/pak>
+package can be used to install and upgrade
+packages in an interactive environment:
+
+```{r}
+devtools::install_github("r-lib/pak")
+
+# upgrade packages quickly and safely
+pak::pkg_install("ggplot2")
+```
+
+
+```{r}
+renv::snapshot(lockfile = "efg")
+
+pak::pkg_install("broom")
+
+renv::history()
+renv::restore(lockfile = "abc")
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
